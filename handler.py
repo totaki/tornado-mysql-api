@@ -70,7 +70,7 @@ class TableHandler(BaseHandler):
     """
     For create table need make POST request to /db/<table_name>, data must be json, example:
     {"field_name": [INT, NOT NULL]}
-    When use POST method body must be exist!
+    When use POST to table add id primary auto increment field!
     For drop table need make DELETE request to /db/<table_name>
     """
 
@@ -89,16 +89,16 @@ class TableHandler(BaseHandler):
 class RecordHandler(BaseHandler):
 
     @staticmethod
-    def validate_rows(table, rows):
+    def validate(validator, table, rows):
         for row in rows:
             for field, value in row.items():
-                row[field] = S.VALIDATE_INSERT[table][field](value)
+                row[field] = validator[table][field](value)
         return rows
 
     @gen.coroutine
     def post(self, table):
         rows = self.get_body()[ROWS_NAME]
-        rows = self.validate_rows(table, rows)
+        rows = self.validate(S.VALIDATE_INSERT, table, rows)
         _ = yield self.send_query(S.INSERT, FETCHALL_FUNC, table, rows)
         _[0] = [i[0] for i in _[0]]
         self.write_json(*_)

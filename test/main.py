@@ -23,14 +23,6 @@ field_1 INT NOT NULL);'
         )
         query_drop = query.drop('test_table')
         self.assertEqual(query_drop, 'DROP TABLE test_table;')
-        # query_insert = query.insert(
-        #     'test',
-        #     [{'field_1': '1', 'field_2': '"str"'}]
-        # )
-        # self.assertEqual(
-        #     query_insert,
-        #     'INSERT INTO test (field_1,field_2) VALUES (1,"str");'
-        # )
         query_insert = query.insert(
             'test',
             [
@@ -43,6 +35,47 @@ field_1 INT NOT NULL);'
             'BEGIN;SET AUTOCOMMIT=0; INSERT INTO test (field_1\
 ,field_2) VALUES (1,"str"); INSERT INTO test (field_1,field_2) VALUES (2,\
 "some"); SET AUTOCOMMIT=1;COMMIT;SELECT id FROM test LIMIT 2;'
+        )
+
+    @testing.gen_test
+    def test_get_conn(self):
+        conn_simple = query.conn('field', query.EQ)
+        _ = conn_simple().format(field='10')
+        self.assertEqual(_, 'field=10')
+
+        conn_one = query.where(query.conn('field_1', query.EQ))
+        _ = conn_one(field_1='1000')
+        self.assertEqual(_, 'WHERE field_1=1000')
+
+        conn_and = query.where(
+            query.conn('field_1', query.EQ), query.AND,
+            query.conn('field_2', query.GE)
+        )
+        _ = conn_and(field_1='10', field_2='20')
+        self.assertIn(_, 
+            ['WHERE field_1=10 AND field_2<=20',
+            'WHERE field_2<=20 AND field_1=10']
+        )
+
+        where_many = query.where(
+            [
+                query.conn('field_1', query.EQ), query.AND,
+                query.conn('field_2', query.EQ),
+            ], query.AND, [
+                query.conn('field_3', query.EQ), query.OR,
+                query.conn('field_4', query.EQ),
+            ]
+        )
+        _ = where_many(field_1='1', field_2='2', field_3='3', field_4='4')
+        self.assertIn(_, 
+            ['WHERE (field_1=1 AND field_2=2) AND \
+(field_3=3 OR field_4=4)',
+            'WHERE (field_2=2 AND field_1=1) AND \
+(field_3=3 OR field_4=4)',
+            'WHERE (field_2=2 AND field_1=1) AND \
+(field_4=4 OR field_3=3)',
+            'WHERE (field_1=1 AND field_2=2) AND \
+(field_4=4 OR field_3=3)']
         )
 
 

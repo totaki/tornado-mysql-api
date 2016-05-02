@@ -8,17 +8,23 @@ TABLE_METHODS = {
     CREATE: create
 }
 
-
 insert_test_table_fields = {
     'field_2': str
 }
 
+select_test_table_fields = {
+    'field_2': str
+}
 
 VALIDATE_INSERT = {
     'test_table': insert_test_table_fields
 }
 
+VALIDATE_SELECT = {
+    'test_table': insert_test_table_fields
+}
 
 RECORDS_METHODS = {
-    INSERT: insert
+    INSERT: insert,
+    SELECT: select,
 }
