@@ -46,6 +46,10 @@ def separate_comma(*args):
     return ','.join(args)
 
 
+def STR(value):
+    return '"{}"'.format(value)
+
+
 def _insert(table, **kwargs):
     _ = 'INSERT INTO {} ({}) VALUES ({});'
     data = ordering(kwargs)
@@ -111,7 +115,7 @@ def select(table, fields='*', where='', page=None, limit=None, order_by=None):
     if type(fields) == list:
         fields = separate_space(*fields)
     _ = 'SELECT {} FROM {} {}'.format(
-        table, fields, where
+        fields, table, where
     )
     if limit and not page:
         _ = '{} LIMIT {}'.format(_, limit)
@@ -123,8 +127,11 @@ def select(table, fields='*', where='', page=None, limit=None, order_by=None):
     return '{};'.format(_)
 
 
-def update():
-    pass
+def update(table, id_, fields):
+    fields = separate_comma(
+        *['{}={}'.format(key, value) for key, value in fields.items()]
+    )
+    return 'UPDATE {} SET {} WHERE id={}'.format(table, fields, id_)
 
 
 def delete():

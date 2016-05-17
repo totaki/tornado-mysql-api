@@ -9,6 +9,7 @@ from tornado_mysql import pools
 FETCHALL_FUNC = 'fetchall'
 CODE ='utf-8'
 ROWS_NAME = 'rows'
+FIELDS_NAME = 'fields'
 
 DB_CONNECTION = dict(
     host=os.environ.get('MYSQL_SERVICE_HOST'), 
@@ -89,16 +90,53 @@ class TableHandler(BaseHandler):
 class RecordHandler(BaseHandler):
 
     @staticmethod
-    def validate(validator, table, rows):
+    def _validate_post(validator, table, rows):
         for row in rows:
             for field, value in row.items():
                 row[field] = validator[table][field](value)
         return rows
 
+    @staticmethod
+    def _validate_put(validator, table, fields):
+        for field, value in fields.items():
+            fields[field] = validator[table][field](value)
+        return fields
+
+    def _validate_get(self, validator, table):
+        _ = dict()
+        for field in validator[table]:
+            value = self.get_query_argument(field, None)
+            if value:
+                _[field] = validator[table][field](value)
+        return _
+
+    @gen.coroutine
+    def get(self, table):
+        _query = {
+            key: self.get_query_argument(key, None) for key in 
+            ['page', 'order_by', 'limit']
+        }
+        _query[FIELDS_NAME] = self.get_query_argument(FIELDS_NAME, '*')
+        _fields = self._validate_get(S.VALIDATE_SELECT, table)
+        _query['where'] = (
+            S.WHERE_SCOPE[table][self.get_query_argument('scope')](**_fields)
+        )
+        _ = yield self.send_query(S.SELECT, FETCHALL_FUNC, table, **_query)
+        self.write_json(*_)
+
     @gen.coroutine
     def post(self, table):
         rows = self.get_body()[ROWS_NAME]
-        rows = self.validate(S.VALIDATE_INSERT, table, rows)
+        rows = self._validate_post(S.VALIDATE_INSERT, table, rows)
         _ = yield self.send_query(S.INSERT, FETCHALL_FUNC, table, rows)
         _[0] = [i[0] for i in _[0]]
+        self.write_json(*_)
+
+    @gen.coroutine
+    def put(self, table):
+        id_ = self.get_query_argument('id', None)
+        fields = self._validate_put(
+            S.VALIDATE_INSERT, table, self.get_body()
+        )
+        _ = yield self.send_query(S.UPDATE, FETCHALL_FUNC, table, id_, fields)
         self.write_json(*_)

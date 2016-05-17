@@ -5,7 +5,22 @@ import query
 import unittest
 import json
 from tornado import testing
-from main import make_app
+from test import fixtures as F
+from tornado.httpclient import AsyncHTTPClient, HTTPError  
+
+
+def to_json(value):
+    return json.dumps(value).encode('utf-8')
+
+
+def from_json(response):
+    return json.loads(response.body.decode('utf-8'))
+
+
+TEST_TABLE_PATH = 'http://local.tma.server:8888/table/test_table'
+TEST_RECORD_PATH = 'http://local.tma.server:8888/record/test_table'
+CREATE_TABLE_1 = to_json(F.CREATE_TABLE_1)
+CREATE_RECORDS_1 = to_json(F.CREATE_RECORDS_1)
 
 
 class TestQueryes(testing.AsyncTestCase):
@@ -78,43 +93,80 @@ field_1 INT NOT NULL);'
 (field_4=4 OR field_3=3)']
         )
 
-
-class TestApiServer(testing.AsyncHTTPTestCase):
-
-    def get_app(self):
-        return make_app()
-
-    def test_1(self):
-        path = '/table/test_table'
-        body = b'{"field_1": ["CHAR(8)"], "field_2": ["INT", "NOT NULL"]}'
+    @testing.gen_test
+    def test_tables(self):
+        client = AsyncHTTPClient(self.io_loop)
+        body = CREATE_TABLE_1
         # Test create table
-        response = self.fetch(path, method='POST', body=body)
+        response = yield client.fetch(TEST_TABLE_PATH, method='POST', body=body)
         self.assertEqual(response.code, 200)
         response = json.loads(response.body.decode('utf-8')) 
         self.assertEqual(response['rows'], [])
         
         # Test raise error when create table if table exist
-        response = self.fetch(path, method='POST', body=body)
-        self.assertEqual(response.code, 400)
+        try:
+            response = yield client.fetch(
+                TEST_TABLE_PATH, method='POST', body=body
+        )
+        except HTTPError as err:
+            self.assertEqual(err.code, 400)
 
         # Test drop table
-        response = self.fetch(path, method='DELETE')
+        response = yield client.fetch(TEST_TABLE_PATH, method='DELETE')
         self.assertEqual(response.code, 200)
 
         # Test raise error when drop table if table not exist
-        response = self.fetch(path, method='DELETE')
-        self.assertEqual(response.code, 400)
+        try:
+            response = yield client.fetch(TEST_TABLE_PATH, method='DELETE')
+        except HTTPError as err:
+            self.assertEqual(err.code, 400)
 
-    def test_2(self):
-        path_table = '/table/test_table'
-        body = b'{"field_1": ["CHAR(8)"], "field_2": ["INT", "NOT NULL"]}'
-        self.fetch(path_table, method='POST', body=body)
-        
-        path_record = '/record/test_table'
-        body = b'{"rows": [{"field_2": 1}, {"field_2": 2}]}'
-        response = self.fetch(path_record, method='POST', body=body)
+    @testing.gen_test
+    def test_records_1(self):
+        client = AsyncHTTPClient(self.io_loop)
+        # Create table
+        body = CREATE_TABLE_1
+        response = yield client.fetch(TEST_TABLE_PATH, method='POST', body=body)
+
+        # Create records
+        body = CREATE_RECORDS_1
+        response = yield client.fetch(
+            TEST_RECORD_PATH, method='POST', body=body)
         self.assertEqual(response.code, 200)
-        response = json.loads(response.body.decode('utf-8')) 
-        self.assertEqual(response['rows'], [1, 2])
+        response = from_json(response) 
+        self.assertEqual(response['rows'], list(range(1,9)))
 
-        self.fetch(path_table, method='DELETE')
+        # Get records
+        response = yield client.fetch(
+            TEST_RECORD_PATH + '?scope=field_2&field_2=3')
+        self.assertEqual(response.code, 200)
+        response = from_json(response)
+        self.assertEqual(len(response['rows']), 2)
+
+        response = yield client.fetch(
+            TEST_RECORD_PATH + '?scope=field_2&field_2=2&limit=2&page=2')
+        self.assertEqual(response.code, 200)
+        response = from_json(response)
+        self.assertEqual(len(response['rows']), 2)
+
+        # Update records
+        response = yield client.fetch(
+            TEST_RECORD_PATH + '?id=1',
+            method='PUT', body=to_json({'field_1': 'updated'})
+        )
+        self.assertEqual(response.code, 200)
+
+        # Get updated record
+        response = yield client.fetch(
+            TEST_RECORD_PATH + '?id=1&scope=id',
+            method='GET'
+        )
+        self.assertEqual(response.code, 200)
+        response = from_json(response)
+        self.assertEqual(response['rows'][0], [1, 'updated', 1])
+
+        # Drop table
+        response = yield client.fetch(
+            TEST_RECORD_PATH, method='POST', body=body)
+
+        yield client.fetch(TEST_TABLE_PATH, method='DELETE')
