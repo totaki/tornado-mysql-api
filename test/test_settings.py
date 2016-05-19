@@ -10,7 +10,8 @@ TABLE_METHODS = {
 
 insert_test_table_fields = {
     'field_2': str,
-    'field_1': STR
+    'field_1': STR,
+    'field_date': STR
 }
 
 select_test_table_fields = {

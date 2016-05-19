@@ -20,7 +20,9 @@ def from_json(response):
 TEST_TABLE_PATH = 'http://local.tma.server:8888/table/test_table'
 TEST_RECORD_PATH = 'http://local.tma.server:8888/record/test_table'
 CREATE_TABLE_1 = to_json(F.CREATE_TABLE_1)
+CREATE_TABLE_2 = to_json(F.CREATE_TABLE_2)
 CREATE_RECORDS_1 = to_json(F.CREATE_RECORDS_1)
+CREATE_RECORDS_2 = to_json(F.CREATE_RECORDS_2)
 
 
 class TestQueryes(testing.AsyncTestCase):
@@ -121,7 +123,7 @@ field_1 INT NOT NULL);'
         except HTTPError as err:
             self.assertEqual(err.code, 400)
 
-        client = AsyncHTTPClient(self.io_loop)
+        # client = AsyncHTTPClient(self.io_loop)
         # Create table
         body = CREATE_TABLE_1
         response = yield client.fetch(TEST_TABLE_PATH, method='POST', body=body)
@@ -170,4 +172,31 @@ field_1 INT NOT NULL);'
         response = yield client.fetch(
             TEST_RECORD_PATH, method='POST', body=body)
 
+        yield client.fetch(TEST_TABLE_PATH, method='DELETE')
+
+        body = CREATE_TABLE_2
+        # Test create table with date
+        response = yield client.fetch(TEST_TABLE_PATH, method='POST', body=body)
+        self.assertEqual(response.code, 200)
+        response = json.loads(response.body.decode('utf-8')) 
+        self.assertEqual(response['rows'], [])
+
+        # Create records
+        body = CREATE_RECORDS_2
+        response = yield client.fetch(
+            TEST_RECORD_PATH, method='POST', body=body)
+        self.assertEqual(response.code, 200)
+        response = from_json(response) 
+        self.assertEqual(response['rows'], list(range(1,6)))
+
+        # Get records
+        response = yield client.fetch(
+            TEST_RECORD_PATH + '?scope=id&id=1')
+        self.assertEqual(response.code, 200)
+        response = from_json(response)
+        self.assertEqual(len(response['rows']), 1)
+        self.assertEqual(response['length'], 1)
+        self.assertEqual(response['rows'][0][1], '2016-10-01')
+
+        # Drop table with date
         yield client.fetch(TEST_TABLE_PATH, method='DELETE')

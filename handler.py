@@ -1,7 +1,7 @@
 import os
 import json
 import tornado.web
-from datetime import datetime
+from datetime import datetime, date
 from settings import settings as S
 from tornado import gen
 from tornado_mysql import pools
@@ -35,6 +35,16 @@ def timer():
     return func
 
 
+class DateTimeEncoder(json.JSONEncoder):
+
+    def default(self, value):
+        if isinstance(value, date) or isinstance(value, datetime):
+            _ = str(value.isoformat())
+        else:
+            _ = json.JSONEncoder.default(self, value)
+        return _
+
+    
 class BaseHandler(tornado.web.RequestHandler):
 
     _pool = POOL
@@ -42,7 +52,7 @@ class BaseHandler(tornado.web.RequestHandler):
     def write_json(self, rows, time, **kwargs):
         self.set_header('Content-Type', 'application/json')
         kwargs.update({ROWS_NAME: rows, 'time': time})
-        _ = json.dumps(kwargs)
+        _ = json.dumps(kwargs, default=DateTimeEncoder().default)
         self.write(_.encode(CODE))
     
     def get_body(self):
