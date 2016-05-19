@@ -121,8 +121,6 @@ field_1 INT NOT NULL);'
         except HTTPError as err:
             self.assertEqual(err.code, 400)
 
-    @testing.gen_test
-    def test_records_1(self):
         client = AsyncHTTPClient(self.io_loop)
         # Create table
         body = CREATE_TABLE_1
@@ -142,12 +140,14 @@ field_1 INT NOT NULL);'
         self.assertEqual(response.code, 200)
         response = from_json(response)
         self.assertEqual(len(response['rows']), 2)
+        self.assertEqual(response['length'], 2)
 
         response = yield client.fetch(
             TEST_RECORD_PATH + '?scope=field_2&field_2=2&limit=2&page=2')
         self.assertEqual(response.code, 200)
         response = from_json(response)
         self.assertEqual(len(response['rows']), 2)
+        self.assertEqual(response['length'], 4)
 
         # Update records
         response = yield client.fetch(
@@ -164,6 +164,7 @@ field_1 INT NOT NULL);'
         self.assertEqual(response.code, 200)
         response = from_json(response)
         self.assertEqual(response['rows'][0], [1, 'updated', 1])
+        self.assertEqual(response['length'], 1)
 
         # Drop table
         response = yield client.fetch(

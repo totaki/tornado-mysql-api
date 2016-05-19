@@ -39,9 +39,10 @@ class BaseHandler(tornado.web.RequestHandler):
 
     _pool = POOL
 
-    def write_json(self, rows, time):
+    def write_json(self, rows, time, **kwargs):
         self.set_header('Content-Type', 'application/json')
-        _ = json.dumps({ROWS_NAME: rows, 'time': time})
+        kwargs.update({ROWS_NAME: rows, 'time': time})
+        _ = json.dumps(kwargs)
         self.write(_.encode(CODE))
     
     def get_body(self):
@@ -118,11 +119,15 @@ class RecordHandler(BaseHandler):
         }
         _query[FIELDS_NAME] = self.get_query_argument(FIELDS_NAME, '*')
         _fields = self._validate_get(S.VALIDATE_SELECT, table)
-        _query['where'] = (
+        _where = (
             S.WHERE_SCOPE[table][self.get_query_argument('scope')](**_fields)
         )
+        _query['where'] = _where
         _ = yield self.send_query(S.SELECT, FETCHALL_FUNC, table, **_query)
-        self.write_json(*_)
+        _length, _time = yield self.send_query(
+            S.COUNT, FETCHALL_FUNC, table, where_query=_where
+        )
+        self.write_json(*_, length=_length[0][0])
 
     @gen.coroutine
     def post(self, table):

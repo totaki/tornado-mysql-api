@@ -37,4 +37,5 @@ RECORDS_METHODS = {
     INSERT: insert,
     SELECT: select,
     UPDATE: update,
+    COUNT: count,
 }

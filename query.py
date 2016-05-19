@@ -8,6 +8,7 @@ SELECT = 'select'
 INSERT = 'insert'
 UPDATE = 'update'
 DELETE = 'delete'
+COUNT = 'count'
 SET = 'SET'
 GET = 'GET'
 QUOTE = '"'
@@ -132,6 +133,10 @@ def update(table, id_, fields):
         *['{}={}'.format(key, value) for key, value in fields.items()]
     )
     return 'UPDATE {} SET {} WHERE id={}'.format(table, fields, id_)
+
+
+def count(table, where_query=''):
+    return 'SELECT COUNT(*) FROM {} {};'.format(table, where_query)
 
 
 def delete():
